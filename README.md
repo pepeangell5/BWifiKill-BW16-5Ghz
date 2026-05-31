@@ -1,5 +1,17 @@
 # BWifiKill BW16 5GHz
 
+<p align="center">
+  <a href="https://www.instagram.com/pepeangelll/">
+    <img alt="Instagram: pepeangelll" src="https://img.shields.io/badge/Instagram-pepeangelll-E4405F?style=for-the-badge&logo=instagram&logoColor=white">
+  </a>
+  <a href="https://www.facebook.com/esp32-tools">
+    <img alt="Facebook: esp32-tools" src="https://img.shields.io/badge/Facebook-esp32--tools-1877F2?style=for-the-badge&logo=facebook&logoColor=white">
+  </a>
+  <a href="https://github.com/pepeangell5">
+    <img alt="GitHub: pepeangell5" src="https://img.shields.io/badge/GitHub-pepeangell5-181717?style=for-the-badge&logo=github&logoColor=white">
+  </a>
+</p>
+
 Firmware academico para Ai-Thinker BW16 / RTL8720DN orientado a pruebas de laboratorio WiFi 2.4 GHz / 5 GHz y BLE. El proyecto integra escaneo, seleccion de objetivo, analisis de trafico, sniffer promiscuo, prueba Deauther controlada, Beacon spam de laboratorio, BLE scanner y BLE spam.
 
 > Uso previsto: laboratorio propio o autorizado. Las funciones activas de transmision deben ejecutarse solo en redes y dispositivos de prueba.
