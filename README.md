@@ -1,8 +1,8 @@
 # BWifiKill BW16 5GHz
 
 <p align="center">
-  <a href="https://www.instagram.com/pepeangelll/">
-    <img alt="Instagram: pepeangelll" src="https://img.shields.io/badge/Instagram-pepeangelll-E4405F?style=for-the-badge&logo=instagram&logoColor=white">
+  <a href="https://www.instagram.com/esp32_tools/">
+    <img alt="Instagram: esp32_tools" src="https://img.shields.io/badge/Instagram-esp32_tools-E4405F?style=for-the-badge&logo=instagram&logoColor=white">
   </a>
   <a href="https://www.facebook.com/esp32-tools">
     <img alt="Facebook: esp32-tools" src="https://img.shields.io/badge/Facebook-esp32--tools-1877F2?style=for-the-badge&logo=facebook&logoColor=white">
