@@ -82,10 +82,19 @@ Los botones trabajan con `INPUT_PULLUP`, por lo que deben cerrar a GND al presio
 
 ### Montaje de referencia
 
-![Conexiones BW16](BWifiKill-BW16/doc/img/BW16-Conexiones.jpg)
-![Pantalla ST7735](BWifiKill-BW16/doc/img/ST7735-pantalla.jpg)
-![Frente de la pantalla](BWifiKill-BW16/doc/img/ST7735-pantalla-frente.jpg)
-![Botones](BWifiKill-BW16/doc/img/boton.png)
+#### Diagrama de conexiones completo
+
+<p align="center">
+  <img src="BWifiKill-BW16/doc/img/BW16-Conexiones.jpg" alt="Diagrama completo de conexiones BW16" width="960">
+</p>
+
+#### Componentes
+
+<p align="center">
+  <img src="BWifiKill-BW16/doc/img/ST7735-pantalla.jpg" alt="Pantalla ST7735" width="210">
+  <img src="BWifiKill-BW16/doc/img/ST7735-pantalla-frente.jpg" alt="Frente de pantalla ST7735" width="210">
+  <img src="BWifiKill-BW16/doc/img/boton.png" alt="Botones" width="150">
+</p>
 
 ## Funciones principales
 
