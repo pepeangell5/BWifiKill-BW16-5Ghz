@@ -100,9 +100,12 @@ void bleSpamBegin() {
 bool bleSpamStart() {
   Serial.println("[BLE_SPAM] start");
 
-  if (bleActive()) {
+  bool scannerWasActive = bleActive();
+  if (scannerWasActive) {
     Serial.println("[BLE_SPAM] paro scanner central");
-    bleStop();
+  }
+  bleRelease();
+  if (scannerWasActive) {
     delay(300);
   }
 
@@ -149,7 +152,8 @@ void bleSpamStop() {
   if (peripheralUp) {
     BLE.configAdvert()->stopAdv();
     delay(50);
-    BLE.end();
+    BLE.deinit();
+    bleMarkStackStopped();
     peripheralUp = false;
     delay(300);
   }

@@ -2,9 +2,13 @@
 
 static uint8_t networkCount = 0;
 static NetworkInfo networks[MAX_NETWORKS];
+static volatile bool scanComplete = false;
+static bool scanInProgress = false;
+static uint32_t scanStartedAt = 0;
 
 static rtw_result_t scanResultHandler(rtw_scan_handler_result_t *scanResult) {
   if (scanResult->scan_complete == RTW_TRUE) {
+    scanComplete = true;
     return RTW_SUCCESS;
   }
 
@@ -13,11 +17,13 @@ static rtw_result_t scanResultHandler(rtw_scan_handler_result_t *scanResult) {
   }
 
   rtw_scan_result_t *record = &scanResult->ap_details;
-  record->SSID.val[record->SSID.len] = 0;
-
   NetworkInfo &network = networks[networkCount];
-  strncpy(network.ssid, (char *)record->SSID.val, WL_SSID_MAX_LENGTH - 1);
-  network.ssid[WL_SSID_MAX_LENGTH - 1] = '\0';
+  uint8_t ssidLen = record->SSID.len;
+  if (ssidLen > WL_SSID_MAX_LENGTH) {
+    ssidLen = WL_SSID_MAX_LENGTH;
+  }
+  memcpy(network.ssid, record->SSID.val, ssidLen);
+  network.ssid[ssidLen] = '\0';
   network.rssi = record->signal_strength;
   network.security = record->security;
   network.channel = record->channel;
@@ -35,14 +41,54 @@ void wifiScannerBegin() {
 }
 
 bool wifiScannerScan() {
-  networkCount = 0;
-
-  if (wifi_scan_networks(scanResultHandler, NULL) != RTW_SUCCESS) {
+  bool succeeded = false;
+  if (!wifiScannerStartScan()) {
     return false;
   }
 
-  delay(SCAN_WAIT_MS);
+  while (!wifiScannerPollScan(&succeeded)) {
+    delay(20);
+  }
+
+  return succeeded;
+}
+
+bool wifiScannerStartScan() {
+  if (scanInProgress) {
+    return false;
+  }
+
+  networkCount = 0;
+  scanComplete = false;
+  scanStartedAt = millis();
+  scanInProgress = true;
+
+  if (wifi_scan_networks(scanResultHandler, NULL) != RTW_SUCCESS) {
+    scanInProgress = false;
+    return false;
+  }
+
   return true;
+}
+
+bool wifiScannerPollScan(bool *succeeded) {
+  if (!scanInProgress) {
+    return false;
+  }
+
+  if (!scanComplete && millis() - scanStartedAt < SCAN_WAIT_MS) {
+    return false;
+  }
+
+  scanInProgress = false;
+  if (succeeded != NULL) {
+    *succeeded = scanComplete;
+  }
+  return true;
+}
+
+bool wifiScannerIsScanning() {
+  return scanInProgress;
 }
 
 uint8_t wifiScannerCount() {

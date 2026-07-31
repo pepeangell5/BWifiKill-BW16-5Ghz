@@ -6,11 +6,36 @@ El firmware BWifiKill usa un modulo Ai-Thinker BW16 con chipset RTL8720DN y core
 
 La version actual incluye funciones pasivas de medicion y funciones activas de demostracion. Las funciones activas deben ejecutarse solo en redes y dispositivos de prueba.
 
+## Conexiones de hardware
+
+| Elemento | Pin del elemento | Pin BW16 |
+| --- | --- | --- |
+| ST7735 | `GND` | `GND` |
+| ST7735 | `VCC` | `3V3` |
+| ST7735 | `SCL` / `SCK` | `PA14` |
+| ST7735 | `SDA` / `MOSI` | `PA12` |
+| ST7735 | `CS` | `PA27` |
+| ST7735 | `DC` | `PA25` |
+| ST7735 | `RST` | `PA26` |
+| ST7735 | `BLK` / `LED` | `PA30` |
+| Boton UP | Un terminal | `PB1` |
+| Boton UP | Segundo terminal | `GND` |
+| Boton OK | Un terminal | `PB3` |
+| Boton OK | Segundo terminal | `GND` |
+| Boton DOWN | Un terminal | `PB2` |
+| Boton DOWN | Segundo terminal | `GND` |
+
+Los botones usan `INPUT_PULLUP`; no requieren resistencia pull-up externa y se activan al cerrar hacia tierra.
+
 ## Modulos principales
 
 ### WiFi scanner
 
 El scanner WiFi registra SSID, BSSID, canal, RSSI y seguridad. Permite separar redes por 2.4 GHz y 5 GHz, guardar un objetivo por BSSID y consultar detalles del objetivo seleccionado.
+
+### Radar WiFi
+
+El Radar WiFi parte de un scan normal, permite seleccionar una banda y un AP, y conserva el BSSID elegido como referencia. La pantalla muestra RSSI, canal y banda mediante un radar animado con barrida verde. El escaneo de actualizacion se procesa de forma no bloqueante para mantener la animacion activa mientras se obtiene una nueva lectura.
 
 ### Deauther de laboratorio
 

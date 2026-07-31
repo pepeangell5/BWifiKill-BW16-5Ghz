@@ -42,11 +42,13 @@ enum BleAnalyzerStatus : uint8_t {
 void bleBegin();
 bool bleStart();
 void bleStop();
+void bleRelease();
+void bleMarkStackStopped();
 bool bleActive();
 void bleResetList();
 
 uint8_t bleCount();
-const BleDeviceInfo &bleDevice(uint8_t index);
+bool bleCopyDevice(uint8_t index, BleDeviceInfo &out);
 
 uint32_t bleTotalPackets();
 uint32_t bleAppleCount();

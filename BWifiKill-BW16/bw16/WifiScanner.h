@@ -5,10 +5,10 @@
 #include <wifi_conf.h>
 
 #define MAX_NETWORKS WL_NETWORKS_LIST_MAXNUM
-#define SCAN_WAIT_MS 6000
+#define SCAN_WAIT_MS 12000
 
 struct NetworkInfo {
-  char ssid[WL_SSID_MAX_LENGTH];
+  char ssid[WL_SSID_MAX_LENGTH + 1];
   int32_t rssi;
   uint32_t security;
   uint8_t channel;
@@ -17,6 +17,9 @@ struct NetworkInfo {
 
 void wifiScannerBegin();
 bool wifiScannerScan();
+bool wifiScannerStartScan();
+bool wifiScannerPollScan(bool *succeeded);
+bool wifiScannerIsScanning();
 uint8_t wifiScannerCount();
 const NetworkInfo &wifiScannerNetwork(uint8_t index);
 bool wifiScannerIs5GHz(uint8_t channel);

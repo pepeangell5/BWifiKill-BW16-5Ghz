@@ -31,6 +31,9 @@ enum UiState {
   UI_BLE_ANALYZER,
   UI_WIFI_ANAL_24,
   UI_WIFI_ANAL_5,
+  UI_RADAR_BAND_MENU,
+  UI_RADAR_NETWORK_LIST,
+  UI_WIFI_RADAR,
   UI_BEACON_SPAM,
   UI_BLE_SPAM,
   UI_SNIFFER
@@ -38,13 +41,13 @@ enum UiState {
 
 static const char *const MAIN_MENU_ITEMS[] = {
   "WiFi",
-  "Deauth",
   "Bluetooth",
   "Sistema"
 };
 
 static const char *const WIFI_MENU_ITEMS[] = {
   "Scan redes",
+  "Radar WiFi",
   "Objetivo",
   "Deauther rapido",
   "Analizador",
@@ -82,6 +85,7 @@ static const uint8_t BLE_MENU_COUNT = sizeof(BLE_MENU_ITEMS) / sizeof(BLE_MENU_I
 static const uint16_t LAB_DEAUTH_REASON = 0x06;
 static const uint8_t LAB_DEAUTH_CYCLE_LIMIT = 10;
 static const uint16_t LAB_DEAUTH_TX_GAP_MS = 100;
+static const uint16_t RADAR_REFRESH_MS = 2500;
 
 UiState uiState = UI_MAIN_MENU;
 uint8_t mainMenuIndex = 0;
@@ -91,6 +95,11 @@ int selectedNetwork = 0;
 int listTop = 0;
 uint8_t selectedBand = 5;
 uint8_t analyzerBand = 5;
+uint32_t lastRadarScanAt = 0;
+NetworkInfo radarNetwork;
+char radarBssid[18] = {0};
+bool radarNetworkFound = false;
+bool radarScanActive = false;
 bool labInjectionStoppedByUser = false;
 int selectedBleDevice = -1;
 int bleListTop = 0;
@@ -128,7 +137,7 @@ void loop() {
     handleDown();
   }
 
-  if (uiState == UI_MAIN_MENU || uiState == UI_WIFI_MENU || uiState == UI_LAB_MENU || uiState == UI_BAND_MENU || uiState == UI_BLE_MENU) {
+  if (uiState == UI_MAIN_MENU || uiState == UI_WIFI_MENU || uiState == UI_LAB_MENU || uiState == UI_BAND_MENU || uiState == UI_RADAR_BAND_MENU || uiState == UI_BLE_MENU) {
     uiTickMenuAnimation();
   }
 
@@ -168,6 +177,33 @@ void loop() {
     if (millis() - lastWifiAnalRefresh > 100) {
       lastWifiAnalRefresh = millis();
       uiRefreshWifiAnalyzer();
+    }
+  }
+
+  if (radarScanActive) {
+    bool scanOk = false;
+    if (wifiScannerPollScan(&scanOk)) {
+      radarScanActive = false;
+      lastRadarScanAt = millis();
+      if (uiState == UI_WIFI_RADAR) {
+        int foundIndex = scanOk ? wifiScannerFindBssid(radarBssid) : -1;
+        radarNetworkFound = foundIndex >= 0;
+        if (radarNetworkFound) {
+          radarNetwork = wifiScannerNetwork(foundIndex);
+          selectedNetwork = foundIndex;
+        }
+        uiDrawWifiRadar(&radarNetwork, radarNetworkFound);
+      }
+    }
+  }
+
+  if (uiState == UI_WIFI_RADAR) {
+    uiTickWifiRadar();
+    if (!radarScanActive && millis() - lastRadarScanAt >= RADAR_REFRESH_MS) {
+      radarScanActive = wifiScannerStartScan();
+      if (!radarScanActive) {
+        lastRadarScanAt = millis();
+      }
     }
   }
 
@@ -243,6 +279,13 @@ void handleUp() {
     return;
   }
 
+  if (uiState == UI_WIFI_RADAR) {
+    uiState = UI_RADAR_BAND_MENU;
+    uiDrawRadarBandMenu(selectedBand);
+    delay(220);
+    return;
+  }
+
   if (uiState == UI_LAB_PRECHECK || uiState == UI_TARGET_MONITOR || uiState == UI_LAB_STATS || uiState == UI_PRINCIPAL_TEST) {
     uiState = UI_LAB_MENU;
     drawLabMenu();
@@ -300,7 +343,19 @@ void handleUp() {
     return;
   }
 
+  if (uiState == UI_RADAR_BAND_MENU) {
+    selectedBand = previousBandOption(selectedBand);
+    uiDrawRadarBandMenu(selectedBand);
+    delay(180);
+    return;
+  }
+
   if (uiState == UI_NETWORK_LIST) {
+    moveSelection(-1);
+    return;
+  }
+
+  if (uiState == UI_RADAR_NETWORK_LIST) {
     moveSelection(-1);
     return;
   }
@@ -371,6 +426,20 @@ void handleOk() {
     return;
   }
 
+  if (uiState == UI_WIFI_RADAR) {
+    int radarIndex = wifiScannerFindBssid(radarBssid);
+    if (radarIndex >= 0) {
+      selectedNetwork = radarIndex;
+    } else {
+      selectFirstNetworkInBand();
+    }
+    listTop = 0;
+    uiState = UI_RADAR_NETWORK_LIST;
+    uiDrawNetworkList(selectedBand, selectedNetwork, listTop);
+    delay(220);
+    return;
+  }
+
   if (uiState == UI_TARGET_MONITOR) {
     runTargetRefresh();
     return;
@@ -421,8 +490,12 @@ void handleOk() {
       return;
     }
     if (selectedBleDevice < (int)bleCount()) {
+      BleDeviceInfo device;
+      if (!bleCopyDevice(selectedBleDevice, device)) {
+        return;
+      }
       uiState = UI_BLE_DETAILS;
-      uiDrawBleDetails(bleDevice(selectedBleDevice));
+      uiDrawBleDetails(device);
       delay(220);
     }
     return;
@@ -441,6 +514,20 @@ void handleOk() {
     return;
   }
 
+  if (uiState == UI_RADAR_BAND_MENU) {
+    if (selectedBand == 0) {
+      uiState = UI_WIFI_MENU;
+      drawWifiMenu();
+      delay(220);
+      return;
+    }
+
+    selectFirstNetworkInBand();
+    uiState = UI_RADAR_NETWORK_LIST;
+    uiDrawNetworkList(selectedBand, selectedNetwork, listTop);
+    return;
+  }
+
   if (uiState == UI_NETWORK_LIST) {
     if (selectedNetwork == -1) {
       uiState = UI_BAND_MENU;
@@ -451,6 +538,17 @@ void handleOk() {
     uiState = UI_NETWORK_DETAILS;
     uiDrawNetworkDetails(wifiScannerNetwork(selectedNetwork), targetHasSelection() && sameTarget(selectedNetwork));
     delay(220);
+    return;
+  }
+
+  if (uiState == UI_RADAR_NETWORK_LIST) {
+    if (selectedNetwork < 0) {
+      uiState = UI_RADAR_BAND_MENU;
+      uiDrawRadarBandMenu(selectedBand);
+      delay(220);
+      return;
+    }
+    startWifiRadar(selectedNetwork);
     return;
   }
 
@@ -524,6 +622,13 @@ void handleDown() {
     return;
   }
 
+  if (uiState == UI_WIFI_RADAR) {
+    uiState = UI_RADAR_BAND_MENU;
+    uiDrawRadarBandMenu(selectedBand);
+    delay(220);
+    return;
+  }
+
   if (uiState == UI_LAB_PRECHECK || uiState == UI_TARGET_MONITOR || uiState == UI_LAB_STATS || uiState == UI_PRINCIPAL_TEST) {
     uiState = UI_LAB_MENU;
     drawLabMenu();
@@ -576,7 +681,19 @@ void handleDown() {
     return;
   }
 
+  if (uiState == UI_RADAR_BAND_MENU) {
+    selectedBand = nextBandOption(selectedBand);
+    uiDrawRadarBandMenu(selectedBand);
+    delay(180);
+    return;
+  }
+
   if (uiState == UI_NETWORK_LIST) {
+    moveSelection(1);
+    return;
+  }
+
+  if (uiState == UI_RADAR_NETWORK_LIST) {
     moveSelection(1);
     return;
   }
@@ -609,6 +726,10 @@ void drawWifiMenu() {
   uiDrawMenu("WiFi", WIFI_MENU_ITEMS, WIFI_MENU_COUNT, wifiMenuIndex, "UP/DOWN  OK");
 }
 
+void drawRadarBandMenu() {
+  uiDrawRadarBandMenu(selectedBand);
+}
+
 void drawLabMenu() {
   uiDrawMenu("Pruebas lab", LAB_MENU_ITEMS, LAB_MENU_COUNT, labMenuIndex, "Objetivo requerido");
 }
@@ -620,13 +741,9 @@ void openMainMenuItem() {
       drawWifiMenu();
       break;
     case 1:
-      uiState = UI_LAB_MENU;
-      drawLabMenu();
-      break;
-    case 2:
       enterBle();
       break;
-    case 3:
+    case 2:
       uiState = UI_SYSTEM_INFO;
       uiDrawSystemInfo(targetHasSelection(), wifiScannerCount(), wifiScannerCountBand(2), wifiScannerCountBand(5));
       break;
@@ -681,6 +798,9 @@ void openWifiMenuItem() {
       runScan();
       break;
     case 1:
+      enterWifiRadar();
+      break;
+    case 2:
       if (!targetHasSelection()) {
         showPlaceholder("Objetivo", "Sin objetivo aun");
       } else {
@@ -688,10 +808,10 @@ void openWifiMenuItem() {
         uiDrawTargetDetails(targetGet());
       }
       break;
-    case 2:
+    case 3:
       runDeauthLab();
       break;
-    case 3:
+    case 4:
       if (wifiScannerCount() == 0) {
         showPlaceholder("Analizador", "Primero haz scan");
       } else {
@@ -700,29 +820,56 @@ void openWifiMenuItem() {
         uiDrawAnalyzer(analyzerBand);
       }
       break;
-    case 4:
+    case 5:
       enterWifiAnalyzer(2);
       break;
-    case 5:
+    case 6:
       enterWifiAnalyzer(5);
       break;
-    case 6:
+    case 7:
       enterSniffer(2);
       break;
-    case 7:
+    case 8:
       enterSniffer(5);
       break;
-    case 8:
+    case 9:
       enterBeaconSpam(2);
       break;
-    case 9:
+    case 10:
       enterBeaconSpam(5);
       break;
-    case 10:
+    case 11:
       uiState = UI_MAIN_MENU;
       drawMainMenu();
       break;
   }
+}
+
+void enterWifiRadar() {
+  uiDrawStatus("Radar: escaneando...");
+
+  if (!wifiScannerScan()) {
+    uiDrawStatus("Radar: scan fallo");
+    delay(900);
+    uiState = UI_WIFI_MENU;
+    drawWifiMenu();
+    return;
+  }
+
+  selectedBand = wifiScannerCountBand(5) > 0 ? 5 : 2;
+  uiState = UI_RADAR_BAND_MENU;
+  drawRadarBandMenu();
+}
+
+void startWifiRadar(int networkIndex) {
+  radarNetwork = wifiScannerNetwork(networkIndex);
+  strncpy(radarBssid, radarNetwork.bssid, sizeof(radarBssid));
+  radarBssid[sizeof(radarBssid) - 1] = '\0';
+  radarNetworkFound = true;
+  radarScanActive = false;
+  lastRadarScanAt = millis();
+  uiState = UI_WIFI_RADAR;
+  uiDrawWifiRadar(&radarNetwork, true);
 }
 
 void enterSniffer(uint8_t band) {
@@ -827,6 +974,14 @@ void openBleMenuItem() {
 }
 
 void openBleScanList() {
+  if (!bleActive()) {
+    uiDrawStatus("Iniciando BLE...");
+    if (!bleStart()) {
+      showPlaceholder("Bluetooth", "BLE fallo");
+      return;
+    }
+  }
+
   selectedBleDevice = -1;
   bleListTop = 0;
   uiState = UI_BLE_LIST;

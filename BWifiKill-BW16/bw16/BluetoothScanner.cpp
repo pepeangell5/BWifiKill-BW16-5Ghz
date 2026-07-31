@@ -6,6 +6,7 @@
 
 static BleDeviceInfo devices[MAX_BLE_DEVICES];
 static uint8_t deviceCount = 0;
+static volatile uint8_t deviceVersions[MAX_BLE_DEVICES] = {0};
 
 static volatile uint32_t totalPackets = 0;
 static volatile uint32_t appleCount = 0;
@@ -73,6 +74,14 @@ static int findWeakestIndex() {
   return weakest;
 }
 
+static void beginDeviceWrite(uint8_t index) {
+  deviceVersions[index]++;
+}
+
+static void endDeviceWrite(uint8_t index) {
+  deviceVersions[index]++;
+}
+
 // ---------------------------------------------------------------------------
 // Callback de scan (corre en task del stack BLE; mantener corto)
 // ---------------------------------------------------------------------------
@@ -97,29 +106,32 @@ static void bleScanCallback(T_LE_CB_DATA *p_data) {
 
   int idx = findDevice(addrStr);
   bool isNew = false;
+  bool publishNew = false;
 
   if (idx < 0) {
     if (deviceCount < MAX_BLE_DEVICES) {
-      idx = deviceCount++;
+      idx = deviceCount;
       isNew = true;
+      publishNew = true;
     } else {
       // Lista llena: reemplazar el mas debil si este es claramente mas fuerte
       int weakest = findWeakestIndex();
       if (rssi > devices[weakest].rssi + 5) {
         idx = weakest;
-        memset(&devices[idx], 0, sizeof(BleDeviceInfo));
         isNew = true;
       } else {
         return;
       }
     }
-    strncpy(devices[idx].addr, addrStr, 17);
-    devices[idx].addr[17] = '\0';
-    devices[idx].seenCount = 0;
-    devices[idx].name[0] = '\0';
   }
 
   BleDeviceInfo &dev = devices[idx];
+  beginDeviceWrite(idx);
+  if (isNew) {
+    memset(&dev, 0, sizeof(BleDeviceInfo));
+    strncpy(dev.addr, addrStr, sizeof(dev.addr) - 1);
+    dev.addr[sizeof(dev.addr) - 1] = '\0';
+  }
   dev.rssi = rssi;
   dev.lastSeen = millis();
   dev.seenCount++;
@@ -151,6 +163,11 @@ static void bleScanCallback(T_LE_CB_DATA *p_data) {
   if (isNew) {
     if (mfg == 0x004C) appleCount++;
     if (mfg == 0x0006) microsoftCount++;
+  }
+
+  endDeviceWrite(idx);
+  if (publishNew) {
+    deviceCount++;
   }
 }
 
@@ -187,12 +204,26 @@ void bleStop() {
   }
 }
 
+void bleRelease() {
+  bleStop();
+  if (initialized) {
+    BLE.deinit();
+    initialized = false;
+  }
+}
+
+void bleMarkStackStopped() {
+  scanning = false;
+  initialized = false;
+}
+
 bool bleActive() {
   return scanning;
 }
 
 void bleResetList() {
   deviceCount = 0;
+  memset((void *)deviceVersions, 0, sizeof(deviceVersions));
   totalPackets = 0;
   appleCount = 0;
   microsoftCount = 0;
@@ -202,8 +233,25 @@ void bleResetList() {
 
 uint8_t bleCount() { return deviceCount; }
 
-const BleDeviceInfo &bleDevice(uint8_t index) {
-  return devices[index];
+bool bleCopyDevice(uint8_t index, BleDeviceInfo &out) {
+  if (index >= deviceCount) {
+    return false;
+  }
+
+  for (uint8_t attempt = 0; attempt < 3; attempt++) {
+    uint8_t before = deviceVersions[index];
+    if (before & 1) {
+      continue;
+    }
+
+    memcpy(&out, &devices[index], sizeof(BleDeviceInfo));
+    uint8_t after = deviceVersions[index];
+    if (before == after && !(after & 1)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 uint32_t bleTotalPackets()   { return totalPackets; }

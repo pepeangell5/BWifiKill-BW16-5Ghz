@@ -15,11 +15,12 @@ El firmware ya integra funciones WiFi, laboratorio de deauth, analisis de trafic
 ## Funciones implementadas
 
 - Splash screen con icono personalizado.
-- Menu principal: WiFi, Deauth, Bluetooth y Sistema.
+- Menu principal: WiFi, Bluetooth y Sistema.
 - Menus redisenados con icono central, contador de posicion `N/TOTAL`, etiqueta resaltada y animacion ligera.
 - Scanner WiFi 2.4 GHz / 5 GHz.
 - Separacion de redes por banda.
 - Detalle de red con SSID, BSSID, canal, RSSI y seguridad.
+- Radar WiFi: scan inicial, seleccion de banda y AP, seguimiento por BSSID y lectura RSSI con barrida verde animada.
 - Seleccion y persistencia de objetivo por BSSID.
 - Atajos de ejecucion:
   - `WiFi > Deauther rapido`.
@@ -67,7 +68,7 @@ El firmware ya integra funciones WiFi, laboratorio de deauth, analisis de trafic
 
 ## Deauther / prueba activa de laboratorio
 
-La opcion `Deauth > Deauther` ya invoca `packet-injection.cpp` desde el menu. El flujo actual es:
+La opcion `WiFi > Deauther rapido` ya invoca `packet-injection.cpp` desde el menu. El flujo actual es:
 
 1. Verifica que exista un objetivo seleccionado.
 2. Valida PMF probable por seguridad WPA3, WPA2/WPA3 o WPA2 AES-CMAC.

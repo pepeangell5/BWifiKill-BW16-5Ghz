@@ -26,6 +26,26 @@ static uint32_t lastMenuAnimAt = 0;
 static const int MENU_ICON_X = 64;
 static const int MENU_ICON_Y = 58;
 
+enum UiSurface : uint8_t {
+  UI_SURFACE_NONE,
+  UI_SURFACE_MENU,
+  UI_SURFACE_WIFI_LIST,
+  UI_SURFACE_BLE_LIST
+};
+
+static UiSurface activeSurface = UI_SURFACE_NONE;
+static uint8_t activeWifiListBand = 0;
+static NetworkInfo radarDisplayNetwork;
+static bool radarDisplayHasNetwork = false;
+static bool radarDisplayFound = false;
+static uint16_t radarSweepAngle = 0;
+static uint32_t lastRadarAnimAt = 0;
+
+static void clearFullScreen() {
+  activeSurface = UI_SURFACE_NONE;
+  tft.fillScreen(UI_BG);
+}
+
 // ==========================================================================
 // Font helpers
 // ==========================================================================
@@ -56,20 +76,38 @@ static uint16_t getStrWidth(const char *txt) {
 }
 
 // ==========================================================================
-// SSID con truncado + elipsis
+// Texto/SSID con truncado por ancho real en pixeles
 // ==========================================================================
+static void printTextFit(const char *txt, uint16_t maxWidth, uint8_t maxChars) {
+  char out[40];
+  const char *src = (txt != NULL && txt[0] != '\0') ? txt : "<oculta>";
+  uint8_t len = strlen(src);
+
+  if (maxChars > 0 && len > maxChars) len = maxChars;
+  if (len >= sizeof(out)) len = sizeof(out) - 1;
+
+  strncpy(out, src, len);
+  out[len] = '\0';
+  bool truncated = strlen(src) > len;
+  if (truncated && len > 1) out[len - 1] = '.';
+
+  while (len > 2 && getStrWidth(out) > maxWidth) {
+    len--;
+    strncpy(out, src, len);
+    out[len] = '\0';
+    out[len - 1] = '.';
+  }
+
+  if (getStrWidth(out) > maxWidth && len > 1) {
+    strcpy(out, ".");
+  }
+  tft.print(out);
+}
+
 static void printSsidSafe(const char *ssid, uint8_t maxChars) {
-  if (ssid == NULL || ssid[0] == '\0') {
-    tft.print("<oculta>");
-    return;
-  }
-  uint8_t len = strlen(ssid);
-  if (len <= maxChars) {
-    tft.print(ssid);
-    return;
-  }
-  for (uint8_t i = 0; i < maxChars - 1; i++) tft.write(ssid[i]);
-  tft.print((char)'.');
+  int16_t cursorX = tft.getCursorX();
+  uint16_t maxWidth = (cursorX < tft.width() - UI_PAD) ? (tft.width() - cursorX - UI_PAD) : 0;
+  printTextFit(ssid, maxWidth, maxChars);
 }
 
 // ==========================================================================
@@ -426,6 +464,13 @@ static void drawMenuIcon(const char *item, int cx, int cy, uint8_t pulse) {
   }
 }
 
+static void drawMenuPulseIndicator(uint8_t pulse) {
+  const int pulseX = MENU_ICON_X + 30;
+  const int pulseY = MENU_ICON_Y + 24;
+  tft.fillCircle(pulseX, pulseY, 3, UI_BG);
+  tft.fillCircle(pulseX, pulseY, pulse ? 2 : 1, pulse ? UI_BRAND : UI_INFO);
+}
+
 // ==========================================================================
 // API
 // ==========================================================================
@@ -434,7 +479,8 @@ void uiBegin() {
   digitalWrite(TFT_BL, HIGH);
   tft.initR(INITR_BLACKTAB);
   tft.setRotation(0);
-  tft.fillScreen(UI_BG);
+  tft.setTextWrap(false);
+  clearFullScreen();
 }
 
 void uiDrawSplash() {
@@ -442,7 +488,7 @@ void uiDrawSplash() {
 }
 
 void uiDrawHome() {
-  tft.fillScreen(UI_BG);
+  clearFullScreen();
   drawStatusBar(FIRMWARE_NAME);
   textDefault(UI_PAD, 25, UI_TEXT, "BW16 2.4 / 5GHz");
   textDefault(UI_PAD, 50, UI_MUTED, "UP    OK    DOWN");
@@ -450,18 +496,18 @@ void uiDrawHome() {
 }
 
 void uiDrawStatus(const char *message) {
-  tft.fillScreen(UI_BG);
+  clearFullScreen();
   drawStatusBar(FIRMWARE_NAME);
   statusBarBusy();
   textDefault(UI_PAD, 60, UI_WARN, message);
 }
 
 void uiDrawTxCounter(uint32_t packetCount) {
-  tft.fillScreen(UI_BG);
+  clearFullScreen();
   drawStatusBar("Deauth lab");
   statusBarTarget(true);
 
-  textDefault(UI_PAD, 22, UI_TEXT_DIM, "Paquetes enviados");
+  textDefault(UI_PAD, 22, UI_TEXT_DIM, "Tramas TX aceptadas");
 
   uint8_t pulse = (millis() / 200) & 1;
   tft.fillCircle(tft.width() - 12, 25, 3, pulse ? UI_DANGER : UI_PANEL);
@@ -478,17 +524,33 @@ void uiDrawTxCounter(uint32_t packetCount) {
 
 void uiDrawMenu(const char *title, const char *const items[], uint8_t itemCount,
                 uint8_t selected, const char *footer) {
+  bool sameMenu = activeSurface == UI_SURFACE_MENU &&
+                  lastMenuTitle == title &&
+                  lastMenuItems == items &&
+                  lastMenuItemCount == itemCount &&
+                  lastMenuFooter == footer;
+
   lastMenuTitle = title;
   lastMenuItems = items;
   lastMenuItemCount = itemCount;
   lastMenuSelected = selected;
   lastMenuFooter = footer;
 
-  tft.fillScreen(UI_BG);
-  drawStatusBar(title);
+  if (!sameMenu) {
+    clearFullScreen();
+    drawStatusBar(title);
+  } else {
+    // Solo cambia el contenido central; barra y pie se mantienen estables.
+    tft.fillRect(0, 16, tft.width(), 16, UI_BG);
+    tft.fillRect(MENU_ICON_X - 30, MENU_ICON_Y - 28, 60, 60, UI_BG);
+    tft.fillRect(0, 94, tft.width(), 26, UI_BG);
+    tft.fillRect(0, 120, tft.width(), 18, UI_BG);
+  }
+  activeSurface = UI_SURFACE_MENU;
 
   char pos[8];
   snprintf(pos, sizeof(pos), "%u/%u", selected + 1, itemCount);
+  tft.fillRect(tft.width() - 34, 2, 32, 10, UI_PANEL);
   statusBarRight(pos, UI_BRAND);
 
   // Previous item
@@ -496,11 +558,12 @@ void uiDrawMenu(const char *title, const char *const items[], uint8_t itemCount,
   tft.setTextColor(UI_MUTED);
   tft.setCursor(UI_PAD, 22);
   tft.print("^ ");
-  tft.print(selected == 0 ? items[itemCount - 1] : items[selected - 1]);
+  printTextFit(selected == 0 ? items[itemCount - 1] : items[selected - 1],
+               tft.width() - UI_PAD - 14, 18);
 
   // Icon
-  uint8_t pulse = menuAnimFrame & 0x01;
-  drawMenuIcon(items[selected], MENU_ICON_X, MENU_ICON_Y, pulse);
+  drawMenuIcon(items[selected], MENU_ICON_X, MENU_ICON_Y, 0);
+  drawMenuPulseIndicator(menuAnimFrame & 0x01);
 
   // Selected pill - tamano segun longitud
   int pillY = 96;
@@ -518,7 +581,7 @@ void uiDrawMenu(const char *title, const char *const items[], uint8_t itemCount,
   if (lx < UI_PAD) lx = UI_PAD;
   tft.setTextColor(UI_TEXT);
   tft.setCursor(lx, pillY + (isShort ? 4 : 8));
-  tft.print(items[selected]);
+  printTextFit(items[selected], tft.width() - lx - 10, isShort ? 10 : 18);
   tft.setTextSize(1);
 
   // Next item
@@ -526,7 +589,8 @@ void uiDrawMenu(const char *title, const char *const items[], uint8_t itemCount,
   tft.setTextColor(UI_MUTED);
   tft.setCursor(UI_PAD, 128);
   tft.print("v ");
-  tft.print(selected + 1 >= itemCount ? items[0] : items[selected + 1]);
+  printTextFit(selected + 1 >= itemCount ? items[0] : items[selected + 1],
+               tft.width() - UI_PAD - 14, 18);
 
   // Footer
   tft.drawFastHLine(UI_PAD, 142, tft.width() - UI_PAD * 2, UI_LINE_SOFT);
@@ -534,13 +598,12 @@ void uiDrawMenu(const char *title, const char *const items[], uint8_t itemCount,
 }
 
 void uiTickMenuAnimation() {
-  if (lastMenuTitle == NULL || lastMenuItems == NULL || lastMenuItemCount == 0) return;
+  if (activeSurface != UI_SURFACE_MENU || lastMenuTitle == NULL || lastMenuItems == NULL || lastMenuItemCount == 0) return;
   uint32_t now = millis();
   if (now - lastMenuAnimAt < 260) return;
   lastMenuAnimAt = now;
   menuAnimFrame++;
-  tft.fillRect(MENU_ICON_X - 30, MENU_ICON_Y - 28, 60, 60, UI_BG);
-  drawMenuIcon(lastMenuItems[lastMenuSelected], MENU_ICON_X, MENU_ICON_Y, menuAnimFrame & 0x01);
+  drawMenuPulseIndicator(menuAnimFrame & 0x01);
 }
 
 static const char *const BAND_MENU_ITEMS[] = { "5GHz", "2.4GHz", "Volver" };
@@ -552,12 +615,26 @@ void uiDrawBandMenu(uint8_t selectedBand) {
   uiDrawMenu("Elegir banda", BAND_MENU_ITEMS, 3, selected, "OK entra");
 }
 
+void uiDrawRadarBandMenu(uint8_t selectedBand) {
+  uint8_t selected = 0;
+  if (selectedBand == 2) selected = 1;
+  else if (selectedBand == 0) selected = 2;
+  uiDrawMenu("Radar: banda", BAND_MENU_ITEMS, 3, selected, "OK selecciona");
+}
+
 void uiDrawNetworkList(uint8_t selectedBand, int selectedNetwork, int listTop) {
-  tft.fillScreen(UI_BG);
+  bool sameList = activeSurface == UI_SURFACE_WIFI_LIST && activeWifiListBand == selectedBand;
+  if (!sameList) {
+    clearFullScreen();
+  } else {
+    tft.fillRect(0, UI_STATUSBAR_H + 1, tft.width(), tft.height() - UI_STATUSBAR_H - 1, UI_BG);
+  }
+  activeSurface = UI_SURFACE_WIFI_LIST;
+  activeWifiListBand = selectedBand;
 
   char title[18];
   snprintf(title, sizeof(title), "WiFi %s", selectedBand == 5 ? "5GHz" : "2.4GHz");
-  drawStatusBar(title);
+  if (!sameList) drawStatusBar(title);
 
   uint8_t visibleCount = wifiScannerCountBand(selectedBand);
   char countTxt[8];
@@ -597,7 +674,7 @@ void uiDrawNetworkList(uint8_t selectedBand, int selectedNetwork, int listTop) {
     useDefault();
     tft.setTextColor(isSel ? UI_TEXT : UI_TEXT_DIM);
     tft.setCursor(UI_PAD, rowY + 1);
-    printSsidSafe(net.ssid, 15);
+    printTextFit(net.ssid, tft.width() - UI_PAD - 34, 18);
 
     drawRssiBars(tft.width() - 22, rowY, net.rssi);
     rowY += 11;
@@ -635,15 +712,24 @@ void uiDrawNetworkList(uint8_t selectedBand, int selectedNetwork, int listTop) {
 
 static void drawDetailScreen(const char *header, const NetworkInfo &net,
                              const char *hint, uint16_t headerColor) {
-  tft.fillScreen(UI_BG);
+  clearFullScreen();
   drawStatusBar(header);
   statusBarTarget(true);
 
-  // SSID prominente (FreeSansBold9pt7b size 1, ~14px de alto)
+  // SSID prominente; si es largo baja a fuente compacta para no invadir badges.
   useHero();
   tft.setTextColor(headerColor);
-  tft.setCursor(UI_PAD, 30); // baseline; top ~y=18
-  printSsidSafe(net.ssid, 14);
+  const char *ssid = (net.ssid[0] != '\0') ? net.ssid : "<oculta>";
+  uint16_t ssidMaxW = tft.width() - UI_PAD * 2;
+  if (strlen(ssid) <= 13 && getStrWidth(ssid) <= ssidMaxW) {
+    tft.setCursor(UI_PAD, 30); // baseline; top ~y=18
+    printTextFit(ssid, ssidMaxW, 14);
+  } else {
+    useDefault();
+    tft.setTextColor(headerColor);
+    tft.setCursor(UI_PAD, 23);
+    printTextFit(ssid, ssidMaxW, 20);
+  }
 
   // Fila de badges
   int bx = UI_PAD, by = 40;
@@ -688,7 +774,7 @@ void uiDrawTargetDetails(const NetworkInfo &network) {
 }
 
 void uiDrawAnalyzer(uint8_t band) {
-  tft.fillScreen(UI_BG);
+  clearFullScreen();
   char title[18];
   snprintf(title, sizeof(title), "Analizador %s", band == 5 ? "5G" : "2.4G");
   drawStatusBar(title);
@@ -741,8 +827,104 @@ void uiDrawAnalyzer(uint8_t band) {
   textDefault(UI_PAD, 138, UI_MUTED, "UP/DOWN banda  OK vuelve");
 }
 
+static void drawRadarScene() {
+  const int centerX = tft.width() / 2;
+  const int centerY = 78;
+  const int outerRadius = 42;
+
+  tft.fillRect(centerX - outerRadius - 2, centerY - outerRadius - 2,
+               outerRadius * 2 + 5, outerRadius * 2 + 5, UI_BG);
+
+  for (uint8_t ring = 1; ring <= 3; ring++) {
+    tft.drawCircle(centerX, centerY, (outerRadius * ring) / 3, UI_LINE_SOFT);
+  }
+
+  for (uint8_t spoke = 0; spoke < 8; spoke++) {
+    float angle = (6.2831853f * spoke) / 8.0f;
+    int endX = centerX + (int)(cos(angle) * outerRadius);
+    int endY = centerY + (int)(sin(angle) * outerRadius);
+    tft.drawLine(centerX, centerY, endX, endY, UI_LINE_SOFT);
+  }
+
+  if (radarDisplayHasNetwork && radarDisplayFound) {
+    uint16_t hash = 0;
+    for (uint8_t j = 0; radarDisplayNetwork.bssid[j] != '\0'; j++) {
+      hash = (uint16_t)(hash * 33u) ^ (uint8_t)radarDisplayNetwork.bssid[j];
+    }
+
+    float angle = (6.2831853f * (hash % 360u)) / 360.0f;
+    int radius = map(constrain(radarDisplayNetwork.rssi, -92, -42), -92, -42, outerRadius - 2, 9);
+    int dotX = centerX + (int)(cos(angle) * radius);
+    int dotY = centerY + (int)(sin(angle) * radius);
+    uint16_t color = wifiScannerIs5GHz(radarDisplayNetwork.channel) ? UI_OK : UI_INFO;
+    tft.drawLine(centerX, centerY, dotX, dotY, UI_LINE);
+    uint8_t pulse = 4 + ((radarSweepAngle / 18) & 0x01);
+    tft.fillCircle(dotX, dotY, pulse, color);
+    tft.drawCircle(dotX, dotY, 7, UI_BG);
+  } else {
+    textDefault(27, 80, UI_WARN, "Fuera de rango");
+  }
+
+  // Barrida verde con estela corta; se repinta solo el viewport del radar.
+  for (uint8_t trail = 3; trail > 0; trail--) {
+    int angleDeg = (int)radarSweepAngle - (int)trail * 7;
+    if (angleDeg < 0) angleDeg += 360;
+    float angle = (6.2831853f * angleDeg) / 360.0f;
+    int endX = centerX + (int)(cos(angle) * (outerRadius - 2));
+    int endY = centerY + (int)(sin(angle) * (outerRadius - 2));
+    uint16_t color = trail == 1 ? 0x1C84 : 0x0B03;
+    tft.drawLine(centerX, centerY, endX, endY, color);
+  }
+  float sweep = (6.2831853f * radarSweepAngle) / 360.0f;
+  int sweepX = centerX + (int)(cos(sweep) * (outerRadius - 1));
+  int sweepY = centerY + (int)(sin(sweep) * (outerRadius - 1));
+  tft.drawLine(centerX, centerY, sweepX, sweepY, UI_OK);
+
+  tft.fillCircle(centerX, centerY, 5, UI_BRAND);
+  tft.drawCircle(centerX, centerY, 7, UI_WARN);
+}
+
+// Radar pasivo: el radio representa RSSI del BSSID seleccionado.
+void uiDrawWifiRadar(const NetworkInfo *network, bool found) {
+  clearFullScreen();
+  drawStatusBar("Radar AP");
+  statusBarRight(found ? "LIVE" : "NO VISTO", found ? UI_OK : UI_WARN);
+
+  radarDisplayHasNetwork = network != NULL;
+  radarDisplayFound = found;
+  if (network != NULL) {
+    radarDisplayNetwork = *network;
+  }
+  lastRadarAnimAt = millis();
+
+  useDefault();
+  tft.setTextColor(UI_TEXT);
+  tft.setCursor(UI_PAD, 21);
+  printTextFit(network != NULL ? network->ssid : NULL, tft.width() - UI_PAD * 2, 20);
+  drawRadarScene();
+
+  if (network != NULL) {
+    char infoBuf[30];
+    snprintf(infoBuf, sizeof(infoBuf), "CH %u   %ld dBm", network->channel, (long)network->rssi);
+    textDefault(UI_PAD, 124, found ? UI_TEXT_DIM : UI_MUTED, infoBuf);
+    textDefault(UI_PAD, 136, wifiScannerIs5GHz(network->channel) ? UI_OK : UI_INFO,
+                wifiScannerIs5GHz(network->channel) ? "5 GHz" : "2.4 GHz");
+  }
+
+  textDefault(UI_PAD, 148, UI_MUTED, "OK cambia AP  UP/DOWN banda");
+}
+
+void uiTickWifiRadar() {
+  if (!radarDisplayHasNetwork) return;
+  uint32_t now = millis();
+  if (now - lastRadarAnimAt < 120) return;
+  lastRadarAnimAt = now;
+  radarSweepAngle = (radarSweepAngle + 12) % 360;
+  drawRadarScene();
+}
+
 void uiDrawSystemInfo(bool hasTarget, uint8_t scanCount, uint8_t count24, uint8_t count5) {
-  tft.fillScreen(UI_BG);
+  clearFullScreen();
   drawStatusBar("Sistema");
   statusBarTarget(hasTarget);
 
@@ -770,7 +952,7 @@ void uiDrawSystemInfo(bool hasTarget, uint8_t scanCount, uint8_t count24, uint8_
 }
 
 void uiDrawLabPrecheck(bool hasTarget, const NetworkInfo *network) {
-  tft.fillScreen(UI_BG);
+  clearFullScreen();
   drawStatusBar("Precheck");
   statusBarTarget(hasTarget);
 
@@ -809,7 +991,7 @@ void uiDrawLabPrecheck(bool hasTarget, const NetworkInfo *network) {
 }
 
 void uiDrawTargetMonitor(const NetworkInfo &network, bool found) {
-  tft.fillScreen(UI_BG);
+  clearFullScreen();
   drawStatusBar(found ? "Activo" : "No visto");
   statusBarTarget(true);
   statusBarBusy();
@@ -842,7 +1024,7 @@ void uiDrawTargetMonitor(const NetworkInfo &network, bool found) {
 }
 
 void uiDrawLabStats(const LabStats &stats) {
-  tft.fillScreen(UI_BG);
+  clearFullScreen();
   drawStatusBar("Resultados");
 
   if (!stats.active || stats.samples == 0) {
@@ -882,7 +1064,7 @@ void uiDrawLabStats(const LabStats &stats) {
 }
 
 void uiDrawPrincipalTest(const LabTestReport &report) {
-  tft.fillScreen(UI_BG);
+  clearFullScreen();
   drawStatusBar(report.title);
   statusBarTarget(true);
 
@@ -913,8 +1095,14 @@ void uiDrawPrincipalTest(const LabTestReport &report) {
 }
 
 void uiDrawBleList(int selected, int listTop) {
-  tft.fillScreen(UI_BG);
-  drawStatusBar("BLE Scan");
+  bool sameList = activeSurface == UI_SURFACE_BLE_LIST;
+  if (!sameList) {
+    clearFullScreen();
+    drawStatusBar("BLE Scan");
+  } else {
+    tft.fillRect(0, UI_STATUSBAR_H + 1, tft.width(), tft.height() - UI_STATUSBAR_H - 1, UI_BG);
+  }
+  activeSurface = UI_SURFACE_BLE_LIST;
 
   uint8_t count = bleCount();
   char buf[24];
@@ -954,7 +1142,11 @@ void uiDrawBleList(int selected, int listTop) {
   const int VISIBLE_ROWS = 7;
   for (int i = 0; i < VISIBLE_ROWS && (listTop + i) < (int)count; i++) {
     int idx = listTop + i;
-    const BleDeviceInfo &dev = bleDevice(idx);
+    BleDeviceInfo dev;
+    if (!bleCopyDevice(idx, dev)) {
+      rowY += rowH;
+      continue;
+    }
     bool isSel = (idx == selected);
 
     if (isSel) {
@@ -1006,7 +1198,7 @@ void uiDrawBleList(int selected, int listTop) {
 }
 
 void uiDrawBleDetails(const BleDeviceInfo &dev) {
-  tft.fillScreen(UI_BG);
+  clearFullScreen();
   drawStatusBar("BLE Detalle");
 
   // Nombre prominente o "<sin nombre>"
@@ -1077,7 +1269,7 @@ void uiDrawBleDetails(const BleDeviceInfo &dev) {
 
 
 void uiDrawSniffer(const SnifferStats &stats) {
-  tft.fillScreen(UI_BG);
+  clearFullScreen();
   drawStatusBar(stats.band == 5 ? "Sniffer 5G" : "Sniffer 2.4G");
   statusBarRight(stats.active ? "RUN" : "STOP", stats.active ? UI_OK : UI_MUTED);
 
@@ -1154,7 +1346,11 @@ void uiRefreshBleList(int selected, int listTop) {
       continue;
     }
 
-    const BleDeviceInfo &dev = bleDevice(idx);
+    BleDeviceInfo dev;
+    if (!bleCopyDevice(idx, dev)) {
+      rowY += rowH;
+      continue;
+    }
     bool isSel = (idx == selected);
 
     if (isSel) {
@@ -1332,7 +1528,7 @@ static void drawBleScope(int x, int y, int w, int h, uint16_t baselinePps) {
 }
 
 void uiDrawBleAnalyzer() {
-  tft.fillScreen(UI_BG);
+  clearFullScreen();
   drawStatusBar("Analizador BLE");
 
   // Osciloscopio
@@ -1533,7 +1729,7 @@ static void drawWifiChannelBars(int x, int y, int w, int h) {
 }
 
 void uiDrawWifiAnalyzer() {
-  tft.fillScreen(UI_BG);
+  clearFullScreen();
   uint8_t band = wifiAnalyzerBand();
   drawStatusBar(band == 5 ? "Trafico 5G" : "Trafico 2.4G");
 
@@ -1602,7 +1798,7 @@ void uiRefreshWifiAnalyzer() {
 // ===========================================================================
 
 void uiDrawBeaconSpam() {
-  tft.fillScreen(UI_BG);
+  clearFullScreen();
   const BeaconSpamStats &s = beaconSpamGetStats();
   drawStatusBar(s.band == 5 ? "Beacon 5G" : "Beacon 2.4G");
 
@@ -1682,7 +1878,7 @@ void uiRefreshBeaconSpam() {
 // ===========================================================================
 
 void uiDrawBleSpam() {
-  tft.fillScreen(UI_BG);
+  clearFullScreen();
   const BleSpamStats &s = bleSpamGetStats();
   drawStatusBar("BLE spam");
 

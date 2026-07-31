@@ -1,8 +1,10 @@
 #include "packet-injection.h"
 
 
-bool wifi_tx_raw_frame(void* frame, size_t length) {
-  if (rltk_wlan_info == NULL || frame == NULL || length == 0) {
+static const size_t MAX_RAW_MGMT_FRAME_BYTES = 0x68;
+
+bool wifi_tx_raw_frame(const void* frame, size_t length) {
+  if (rltk_wlan_info == NULL || frame == NULL || length == 0 || length > MAX_RAW_MGMT_FRAME_BYTES) {
     return false;
   }
 

@@ -36,7 +36,7 @@ extern "C" void* alloc_mgtxmitframe(void* ptr);
 extern "C" void update_mgntframe_attrib(void* ptr, void* frame_control);
 extern "C" int dump_mgntframe(void* ptr, void* frame_control);
 
-bool wifi_tx_raw_frame(void* frame, size_t length);
+bool wifi_tx_raw_frame(const void* frame, size_t length);
 bool wifi_tx_deauth_frame(void* src_mac, void* dst_mac, uint16_t reason = 0x06);
 bool wifi_tx_beacon_frame(void* src_mac, void* dst_mac, const char *ssid);
 

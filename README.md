@@ -28,7 +28,8 @@ BWifiKill-BW16-5Ghz/
     |   `-- img/
     `-- doc/
         |-- AVANCE_PROYECTO.md
-        `-- INFORME_TECNICO.md
+        |-- INFORME_TECNICO.md
+        `-- img/
 ```
 
 ## Plataforma
@@ -55,12 +56,17 @@ BWifiKill-BW16-5Ghz/
 
 ### Pantalla ST7735
 
-| Funcion TFT | Pin BW16 |
-| --- | --- |
-| `TFT_CS` | `PA27` |
-| `TFT_DC` | `PA25` |
-| `TFT_RST` | `PA26` |
-| `TFT_BL` | `PA30` |
+| Pin ST7735 | Conexion BW16 | Funcion |
+| --- | --- | --- |
+| `GND` | `GND` | Tierra comun |
+| `VCC` | `3V3` | Alimentacion a 3.3 V |
+| `SCL` / `SCK` / `CLK` | `PA14` | Reloj SPI |
+| `SDA` / `MOSI` / `DIN` | `PA12` | Datos SPI hacia pantalla |
+| `CS` | `PA27` | Chip select, `TFT_CS` |
+| `DC` / `A0` | `PA25` | Datos/comando, `TFT_DC` |
+| `RST` / `RES` | `PA26` | Reset, `TFT_RST` |
+| `BLK` / `LED` | `PA30` | Retroiluminacion, `TFT_BL` |
+| `MISO` / `SDA_OUT` | Sin conectar | No se utiliza en esta interfaz |
 
 La libreria usada por la interfaz es `Adafruit_ST7735` con rotacion vertical `0`.
 
@@ -68,18 +74,24 @@ La libreria usada por la interfaz es `Adafruit_ST7735` con rotacion vertical `0`
 
 Los botones trabajan con `INPUT_PULLUP`, por lo que deben cerrar a GND al presionarse.
 
-| Boton | Pin BW16 | Funcion |
-| --- | --- | --- |
-| `UP` | `PB1` | Navegar arriba / volver en algunas pantallas |
-| `OK` | `PB3` | Entrar / ejecutar / detener pruebas activas |
-| `DOWN` | `PB2` | Navegar abajo / volver en algunas pantallas |
+| Boton | Pin BW16 | Otro terminal | Funcion |
+| --- | --- | --- | --- |
+| `UP` | `PB1` | `GND` | Navegar arriba / volver en algunas pantallas |
+| `OK` | `PB3` | `GND` | Entrar / ejecutar / detener pruebas activas |
+| `DOWN` | `PB2` | `GND` | Navegar abajo / volver en algunas pantallas |
+
+### Montaje de referencia
+
+![Conexiones BW16](BWifiKill-BW16/doc/img/BW16-Conexiones.jpg)
+![Pantalla ST7735](BWifiKill-BW16/doc/img/ST7735-pantalla.jpg)
+![Frente de la pantalla](BWifiKill-BW16/doc/img/ST7735-pantalla-frente.jpg)
+![Botones](BWifiKill-BW16/doc/img/boton.png)
 
 ## Funciones principales
 
 ### Menu principal
 
 - WiFi.
-- Deauth.
 - Bluetooth.
 - Sistema.
 
@@ -90,6 +102,7 @@ Los botones trabajan con `INPUT_PULLUP`, por lo que deben cerrar a GND al presio
 El menu WiFi incluye:
 
 - Scan redes.
+- Radar WiFi.
 - Objetivo.
 - Deauther rapido.
 - Analizador.
@@ -103,6 +116,8 @@ El menu WiFi incluye:
 ![Menu WiFi](BWifiKill-BW16/bw16/img/wifi/wifi-menu.JPG)
 
 El scanner separa redes por banda, permite elegir objetivo por BSSID y muestra SSID, BSSID, canal, RSSI y seguridad.
+
+El Radar WiFi realiza un scan inicial, permite elegir banda y AP, y sigue el BSSID elegido con una visualizacion RSSI animada. La barrida continua mientras se obtiene la siguiente lectura.
 
 ![Scan WiFi](BWifiKill-BW16/bw16/img/wifi/wifi-scann.JPG)
 ![Objetivo WiFi](BWifiKill-BW16/bw16/img/wifi/wifi-objetivo.JPG)
@@ -118,7 +133,7 @@ Flujo tecnico:
 3. Convierte BSSID a bytes MAC.
 4. Fija canal del objetivo.
 5. Envia tramas de deauth a broadcast con origen/AP igual al BSSID objetivo.
-6. Muestra contador de paquetes enviados.
+6. Muestra contador de tramas TX aceptadas.
 7. Permite detener con `OK`.
 8. Al detener, regresa al menu anterior sin re-scan.
 
@@ -210,7 +225,7 @@ FQBN: realtek:AmebaD:Ai-Thinker_BW16
 Compilacion verificada localmente:
 
 ```text
-El Sketch usa 905980 bytes (43%) del espacio de almacenamiento de programa.
+El Sketch usa 910076 bytes (43%) del espacio de almacenamiento de programa.
 ```
 
 ## Documentacion
