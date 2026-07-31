@@ -85,7 +85,7 @@ Los botones trabajan con `INPUT_PULLUP`, por lo que deben cerrar a GND al presio
 #### Diagrama de conexiones completo
 
 <p align="center">
-  <img src="BWifiKill-BW16/doc/img/BW16-Conexiones.jpg" alt="Diagrama completo de conexiones BW16" width="960">
+  <img src="BWifiKill-BW16/doc/img/conexiones-bw16.jpg" alt="Diagrama completo de conexiones BW16" width="960">
 </p>
 
 #### Componentes
