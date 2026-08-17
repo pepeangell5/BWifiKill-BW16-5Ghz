@@ -65,7 +65,7 @@ BWifiKill-BW16-5Ghz/
 | `CS` | `PA27` | Chip select, `TFT_CS` |
 | `DC` / `A0` | `PA25` | Datos/comando, `TFT_DC` |
 | `RST` / `RES` | `PA26` | Reset, `TFT_RST` |
-| `BLK` / `LED` | `PA30` | Retroiluminacion, `TFT_BL` |
+| `BLK` / `LED` | `3v` | Retroiluminacion, `TFT_BL` |
 | `MISO` / `SDA_OUT` | Sin conectar | No se utiliza en esta interfaz |
 
 La libreria usada por la interfaz es `Adafruit_ST7735` con rotacion vertical `0`.
