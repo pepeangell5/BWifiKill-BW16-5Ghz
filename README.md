@@ -24,6 +24,7 @@ BWifiKill-BW16-5Ghz/
 `-- BWifiKill-BW16/
     |-- bw16/
     |   |-- bw16.ino
+    |   |-- ui_lang.h / ui_strings_es.h / ui_strings_en.h
     |   |-- *.cpp / *.h
     |   `-- img/
     `-- doc/
@@ -95,6 +96,29 @@ Los botones trabajan con `INPUT_PULLUP`, por lo que deben cerrar a GND al presio
   <img src="BWifiKill-BW16/doc/img/ST7735-pantalla-frente.jpg" alt="Frente de pantalla ST7735" width="210">
   <img src="BWifiKill-BW16/doc/img/boton.png" alt="Botones" width="150">
 </p>
+
+## UI language (product customization)
+
+UI text is externalized as a compile-time language layer:
+
+- `bw16/ui_lang.h` — language selector
+- `bw16/ui_strings_es.h` — Spanish (default)
+- `bw16/ui_strings_en.h` — English
+
+Spanish is the default; nothing changes unless you opt in. To build the English UI, set `UI_LANG_EN` to `1` in `bw16/ui_lang.h`:
+
+```c
+#define UI_LANG_EN 1
+```
+
+or pass it as a compiler flag (arduino-cli):
+
+```sh
+arduino-cli compile --fqbn realtek:AmebaD:Ai-Thinker_BW16 \
+  --build-property "compiler.cpp.extra_flags=-DUI_LANG_EN=1"
+```
+
+Note: joke/demo SSID and BLE names (e.g. `AirPods_De_Tu_Ex`) are intentionally kept in Spanish in both languages.
 
 ## Funciones principales
 

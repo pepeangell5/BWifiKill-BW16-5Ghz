@@ -3,6 +3,7 @@
 #include "BLEDevice.h"
 
 #include <string.h>
+#include "ui_lang.h"
 
 static BleDeviceInfo devices[MAX_BLE_DEVICES];
 static uint8_t deviceCount = 0;
@@ -419,8 +420,8 @@ uint8_t blePpsHistoryHead() {
 const char *bleAnalyzerStatusLabel(BleAnalyzerStatus s) {
   switch (s) {
     case BLE_STATUS_NORMAL: return "Normal";
-    case BLE_STATUS_LOW:    return "Bajo";
-    case BLE_STATUS_HIGH:   return "Alto";
-    default:                return "Calibrando";
+    case BLE_STATUS_LOW:    return UIS_LOW;
+    case BLE_STATUS_HIGH:   return UIS_HIGH;
+    default:                return UIS_CALIBRATING;
   }
 }

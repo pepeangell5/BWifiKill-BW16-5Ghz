@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "BluetoothScanner.h"
+#include "ui_lang.h"
 
 // GAP low-level: necesario para cambiar la random address en runtime
 extern "C" {
@@ -102,7 +103,7 @@ bool bleSpamStart() {
 
   bool scannerWasActive = bleActive();
   if (scannerWasActive) {
-    Serial.println("[BLE_SPAM] paro scanner central");
+    Serial.println(UIS_BLE_SPAM_STOPPING_CENTRAL_SCANNER);
   }
   bleRelease();
   if (scannerWasActive) {
@@ -142,7 +143,7 @@ bool bleSpamStart() {
   stats.totalTx = 1;
   lastChangeAt = millis();
 
-  Serial.print("[BLE_SPAM] anunciando ");
+  Serial.print(UIS_BLE_SPAM_ADVERTISING);
   Serial.println(BLE_NAMES[0]);
   return true;
 }
