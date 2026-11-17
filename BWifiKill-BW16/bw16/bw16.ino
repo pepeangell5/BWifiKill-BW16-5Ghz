@@ -1,3 +1,4 @@
+#include "ui_lang.h"
 #include "Config.h"
 #include "DisplayUi.h"
 #include "LabStats.h"
@@ -42,40 +43,40 @@ enum UiState {
 static const char *const MAIN_MENU_ITEMS[] = {
   "WiFi",
   "Bluetooth",
-  "Sistema"
+  UIS_SYSTEM
 };
 
 static const char *const WIFI_MENU_ITEMS[] = {
-  "Scan redes",
-  "Radar WiFi",
-  "Objetivo",
-  "Deauther rapido",
-  "Analizador",
-  "Trafico 2.4G",
-  "Trafico 5G",
+  UIS_SCAN_NETWORKS,
+  UIS_WIFI_RADAR,
+  UIS_TARGET_2,
+  UIS_QUICK_DEAUTH,
+  UIS_ANALYZER,
+  UIS_TRAFFIC_2_4G,
+  UIS_TRAFFIC_5G,
   "Sniffer 2.4G",
   "Sniffer 5G",
   "Beacon 2.4G",
   "Beacon 5G",
-  "Volver"
+  UIS_BACK_2
 };
 
 static const char *const LAB_MENU_ITEMS[] = {
   "Deauther",
-  "Prueba principal",
+  UIS_MAIN_TEST,
   "Precheck",
   "Monitor RSSI",
-  "Re-scan objetivo",
-  "Resultados",
+  UIS_RE_SCAN_TARGET,
+  UIS_RESULTS,
   "Reset stats",
-  "Volver"
+  UIS_BACK_2
 };
 
 static const char *const BLE_MENU_ITEMS[] = {
-  "Scan dispositivos",
-  "Analizador",
+  UIS_SCAN_DEVICES,
+  UIS_ANALYZER,
   "BLE spam",
-  "Volver"
+  UIS_BACK_2
 };
 
 static const uint8_t MAIN_MENU_COUNT = sizeof(MAIN_MENU_ITEMS) / sizeof(MAIN_MENU_ITEMS[0]);
@@ -731,7 +732,7 @@ void drawRadarBandMenu() {
 }
 
 void drawLabMenu() {
-  uiDrawMenu("Pruebas lab", LAB_MENU_ITEMS, LAB_MENU_COUNT, labMenuIndex, "Objetivo requerido");
+  uiDrawMenu(UIS_LAB_TESTS, LAB_MENU_ITEMS, LAB_MENU_COUNT, labMenuIndex, UIS_TARGET_REQUIRED);
 }
 
 void openMainMenuItem() {
@@ -764,7 +765,7 @@ void openLabMenuItem() {
       break;
     case 3:
       if (!targetHasSelection()) {
-        showPlaceholder("Monitor RSSI", "Sin objetivo aun");
+        showPlaceholder("Monitor RSSI", UIS_NO_TARGET_YET);
       } else {
         uiState = UI_TARGET_MONITOR;
         uiDrawTargetMonitor(targetGet(), true);
@@ -780,9 +781,9 @@ void openLabMenuItem() {
     case 6:
       if (targetHasSelection()) {
         labStatsReset(targetGet().bssid);
-        showPlaceholder("Stats", "Reiniciadas");
+        showPlaceholder("Stats", UIS_REBOOTS);
       } else {
-        showPlaceholder("Stats", "Sin objetivo aun");
+        showPlaceholder("Stats", UIS_NO_TARGET_YET);
       }
       break;
     case 7:
@@ -802,7 +803,7 @@ void openWifiMenuItem() {
       break;
     case 2:
       if (!targetHasSelection()) {
-        showPlaceholder("Objetivo", "Sin objetivo aun");
+        showPlaceholder(UIS_TARGET_2, UIS_NO_TARGET_YET);
       } else {
         uiState = UI_TARGET_DETAILS;
         uiDrawTargetDetails(targetGet());
@@ -813,7 +814,7 @@ void openWifiMenuItem() {
       break;
     case 4:
       if (wifiScannerCount() == 0) {
-        showPlaceholder("Analizador", "Primero haz scan");
+        showPlaceholder(UIS_ANALYZER, "Primero haz scan");
       } else {
         analyzerBand = selectedBand == 0 ? 5 : selectedBand;
         uiState = UI_ANALYZER;
@@ -846,10 +847,10 @@ void openWifiMenuItem() {
 }
 
 void enterWifiRadar() {
-  uiDrawStatus("Radar: escaneando...");
+  uiDrawStatus(UIS_RADAR_SCANNING);
 
   if (!wifiScannerScan()) {
-    uiDrawStatus("Radar: scan fallo");
+    uiDrawStatus(UIS_RADAR_SCAN_FAIL);
     delay(900);
     uiState = UI_WIFI_MENU;
     drawWifiMenu();
@@ -875,7 +876,7 @@ void startWifiRadar(int networkIndex) {
 void enterSniffer(uint8_t band) {
   uiDrawStatus(band == 5 ? "Sniffer 5G..." : "Sniffer 2.4G...");
   if (!sniffStart(band)) {
-    showPlaceholder("Sniffer", "WiFi fallo");
+    showPlaceholder("Sniffer", UIS_WIFI_FAIL);
     return;
   }
   uiState = UI_SNIFFER;
@@ -890,9 +891,9 @@ void exitSniffer() {
 }
 
 void enterWifiAnalyzer(uint8_t band) {
-  uiDrawStatus(band == 5 ? "Iniciando 5G..." : "Iniciando 2.4G...");
+  uiDrawStatus(band == 5 ? UIS_STARTING_5G : UIS_STARTING_2_4G);
   if (!sniffStart(band)) {
-    showPlaceholder("Trafico", "WiFi fallo");
+    showPlaceholder(UIS_TRAFFIC, UIS_WIFI_FAIL);
     return;
   }
   uiState = (band == 5) ? UI_WIFI_ANAL_5 : UI_WIFI_ANAL_24;
@@ -907,9 +908,9 @@ void exitWifiAnalyzer() {
 }
 
 void enterBeaconSpam(uint8_t band) {
-  uiDrawStatus(band == 5 ? "Iniciando Beacon 5G..." : "Iniciando Beacon 2.4G...");
+  uiDrawStatus(band == 5 ? UIS_STARTING_BEACON_5G : UIS_STARTING_BEACON_2_4G);
   if (!beaconSpamStart(band)) {
-    showPlaceholder("Beacon", "WiFi fallo");
+    showPlaceholder("Beacon", UIS_WIFI_FAIL);
     return;
   }
   uiState = UI_BEACON_SPAM;
@@ -925,9 +926,9 @@ void exitBeaconSpam() {
 
 void enterBle() {
   if (!bleActive()) {
-    uiDrawStatus("Iniciando BLE...");
+    uiDrawStatus(UIS_STARTING_BLE);
     if (!bleStart()) {
-      showPlaceholder("Bluetooth", "BLE fallo");
+      showPlaceholder("Bluetooth", UIS_BLE_FAIL);
       return;
     }
   }
@@ -944,9 +945,9 @@ void exitBle() {
 }
 
 void enterBleSpam() {
-  uiDrawStatus("Iniciando BLE spam...");
+  uiDrawStatus(UIS_STARTING_BLE_SPAM);
   if (!bleSpamStart()) {
-    showPlaceholder("BLE spam", "BLE fallo");
+    showPlaceholder("BLE spam", UIS_BLE_FAIL);
     return;
   }
   uiState = UI_BLE_SPAM;
@@ -961,7 +962,7 @@ void exitBleSpam() {
 }
 
 void drawBleMenu() {
-  uiDrawMenu("Bluetooth", BLE_MENU_ITEMS, BLE_MENU_COUNT, bleMenuIndex, "Scan / Analizar");
+  uiDrawMenu("Bluetooth", BLE_MENU_ITEMS, BLE_MENU_COUNT, bleMenuIndex, UIS_SCAN_ANALYZE);
 }
 
 void openBleMenuItem() {
@@ -975,9 +976,9 @@ void openBleMenuItem() {
 
 void openBleScanList() {
   if (!bleActive()) {
-    uiDrawStatus("Iniciando BLE...");
+    uiDrawStatus(UIS_STARTING_BLE);
     if (!bleStart()) {
-      showPlaceholder("Bluetooth", "BLE fallo");
+      showPlaceholder("Bluetooth", UIS_BLE_FAIL);
       return;
     }
   }
@@ -1051,7 +1052,7 @@ void moveBleSelection(int delta) {
 
 void runPrincipalTest() {
   if (!targetHasSelection()) {
-    showPlaceholder("Principal", "Sin objetivo aun");
+    showPlaceholder(UIS_MAIN, UIS_NO_TARGET_YET);
     return;
   }
 
@@ -1064,7 +1065,7 @@ void runPrincipalTest() {
   }
 
   labTestPrepare(targetGet());
-  uiDrawStatus("Prueba principal...");
+  uiDrawStatus(UIS_MAIN_TEST_2);
 
   bool scanOk = wifiScannerScan();
   int foundIndex = scanOk ? wifiScannerFindBssid(targetBssid) : -1;
@@ -1088,7 +1089,7 @@ void runPrincipalTest() {
 
 void runDeauthLab() {
   if (!targetHasSelection()) {
-    showPlaceholder("Deauther", "Sin objetivo aun");
+    showPlaceholder("Deauther", UIS_NO_TARGET_YET);
     return;
   }
 
@@ -1137,7 +1138,7 @@ bool runPacketInjectionLab(const NetworkInfo &target) {
 
   if (isInjectionBlockedSecurity(target.security)) {
     Serial.println("[LAB] Packet injection omitida: PMF/WPA3 probable.");
-    uiDrawStatus("PMF/WPA3 probable");
+    uiDrawStatus(UIS_PMF_WPA3_LIKELY);
     delay(900);
     return false;
   }
@@ -1145,23 +1146,23 @@ bool runPacketInjectionLab(const NetworkInfo &target) {
   uint8_t targetMac[6];
   if (!parseMacAddress(target.bssid, targetMac)) {
     Serial.println("[LAB] Packet injection omitida: BSSID invalido.");
-    uiDrawStatus("BSSID invalido");
+    uiDrawStatus(UIS_INVALID_BSSID);
     delay(900);
     return false;
   }
 
   uint8_t broadcastMac[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
-  Serial.print("[LAB] Invocando packet injection en BSSID ");
+  Serial.print(UIS_LAB_INVOKING_PACKET_INJECTION_ON_BSSID);
   Serial.println(target.bssid);
-  Serial.print("[LAB] Canal objetivo ");
+  Serial.print(UIS_LAB_TARGET_CHANNEL);
   Serial.println(target.channel);
 
   if (!rearmLabWifi(target.channel)) {
     return false;
   }
 
-  uiDrawStatus("OK detiene");
+  uiDrawStatus(UIS_OK_STOP);
   waitForLabButtonsReleased();
 
   bool anySent = false;
@@ -1194,8 +1195,8 @@ bool runPacketInjectionLab(const NetworkInfo &target) {
     }
 
     if (!rearmLabWifi(target.channel)) {
-      Serial.println("[LAB] No se pudo rearmar WiFi; prueba detenida.");
-      uiDrawStatus("WiFi rearm fallo");
+      Serial.println(UIS_LAB_COULD_NOT_REARM_WIFI_TEST_STOPPED);
+      uiDrawStatus(UIS_WIFI_REARM_FAIL);
       delay(900);
       return anySent;
     }
@@ -1203,22 +1204,22 @@ bool runPacketInjectionLab(const NetworkInfo &target) {
 }
 
 bool rearmLabWifi(uint8_t channel) {
-  uiDrawStatus("Rearmando WiFi...");
+  uiDrawStatus(UIS_REARMING_WIFI);
   wifi_off();
   delay(220);
 
   if (wifi_on(RTW_MODE_STA) != RTW_SUCCESS) {
-    Serial.println("[LAB] wifi_on fallo.");
-    uiDrawStatus("WiFi on fallo");
+    Serial.println(UIS_LAB_WIFI_ON_FAILED);
+    uiDrawStatus(UIS_WIFI_ON_FAIL);
     delay(300);
     return false;
   }
 
   delay(240);
-  uiDrawStatus("Fijando canal...");
+  uiDrawStatus(UIS_SETTING_CHANNEL);
   if (wifi_set_channel(channel) != RTW_SUCCESS) {
-    Serial.println("[LAB] No se pudo fijar el canal objetivo.");
-    uiDrawStatus("Canal fallo");
+    Serial.println(UIS_LAB_COULD_NOT_SET_TARGET_CHANNEL);
+    uiDrawStatus(UIS_CHANNEL_FAIL);
     delay(120);
     return false;
   }
@@ -1229,10 +1230,10 @@ bool rearmLabWifi(uint8_t channel) {
 
 bool stopPacketInjectionLab(bool anySent, uint32_t sentCount) {
   labInjectionStoppedByUser = true;
-  Serial.println("[LAB] Packet injection detenida por boton.");
+  Serial.println(UIS_LAB_PACKET_INJECTION_STOPPED_BY_BUTTON);
   Serial.print("[LAB] Total frames OK: ");
   Serial.println(sentCount);
-  uiDrawStatus("Detenido");
+  uiDrawStatus(UIS_STOPPED);
   delay(700);
   waitForLabButtonsReleased();
   return anySent;
@@ -1316,7 +1317,7 @@ int hexValue(char value) {
 
 void runTargetRefresh() {
   if (!targetHasSelection()) {
-    showPlaceholder("Re-scan", "Sin objetivo aun");
+    showPlaceholder("Re-scan", UIS_NO_TARGET_YET);
     return;
   }
 
@@ -1328,7 +1329,7 @@ void runTargetRefresh() {
     labStatsReset(targetBssid);
   }
 
-  uiDrawStatus("Buscando objetivo...");
+  uiDrawStatus(UIS_SEARCHING_TARGET);
 
   bool scanOk = wifiScannerScan();
   int foundIndex = scanOk ? wifiScannerFindBssid(targetBssid) : -1;
@@ -1367,14 +1368,14 @@ void showPlaceholder(const char *title, const char *message) {
 }
 
 void runScan() {
-  uiDrawStatus("Escaneando...");
+  uiDrawStatus(UIS_SCANNING);
 
   selectedNetwork = 0;
   listTop = 0;
   uiState = UI_WIFI_MENU;
 
   if (!wifiScannerScan()) {
-    uiDrawStatus("Scan fallo");
+    uiDrawStatus(UIS_SCAN_FAIL);
     delay(1200);
     drawWifiMenu();
     return;
@@ -1407,7 +1408,7 @@ uint8_t previousBandOption(uint8_t current) {
 
 void moveSelection(int delta) {
   if (wifiScannerCount() == 0) {
-    uiDrawStatus("OK para scan");
+    uiDrawStatus(UIS_OK_STOP_SCAN);
     delay(250);
     return;
   }

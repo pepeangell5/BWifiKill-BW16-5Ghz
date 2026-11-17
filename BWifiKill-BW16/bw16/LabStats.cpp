@@ -1,4 +1,5 @@
 #include "LabStats.h"
+#include "ui_lang.h"
 
 static LabStats stats = { false, "", 0, 0, 0, 0, 0, 0, 0 };
 
@@ -61,19 +62,19 @@ void labStatsPrintToSerial() {
   Serial.println("=== BWifiKill Lab Stats ===");
   Serial.print("BSSID: ");
   Serial.println(stats.bssid);
-  Serial.print("Muestras: ");
+  Serial.print(UIS_SAMPLES_2);
   Serial.println(stats.samples);
-  Serial.print("Detectado: ");
+  Serial.print(UIS_DETECTED);
   Serial.println(stats.found);
-  Serial.print("Perdidas: ");
+  Serial.print(UIS_LOST);
   Serial.println(stats.missed);
-  Serial.print("RSSI min/prom/max: ");
+  Serial.print(UIS_RSSI_MIN_AVG_MAX_2);
   Serial.print(stats.minRssi);
   Serial.print("/");
   Serial.print(labStatsAverageRssi());
   Serial.print("/");
   Serial.println(stats.maxRssi);
-  Serial.print("Ultimo canal: ");
+  Serial.print(UIS_LAST_CHANNEL);
   Serial.println(stats.lastChannel);
   Serial.println("===========================");
 }

@@ -4,6 +4,7 @@
 #include <wifi_conf.h>
 #include <wifi_constants.h>
 #include <string.h>
+#include "ui_lang.h"
 
 #ifndef RTW_PROMISC_DISABLE
 #define RTW_PROMISC_DISABLE   0
@@ -231,9 +232,9 @@ uint8_t wifiAnalyzerBand() { return stats.band; }
 const char *wifiAnalStatusLabel(WifiAnalStatus s) {
   switch (s) {
     case WIFI_ANAL_NORMAL: return "Normal";
-    case WIFI_ANAL_LOW:    return "Bajo";
-    case WIFI_ANAL_HIGH:   return "Alto";
-    default:               return "Calibrando";
+    case WIFI_ANAL_LOW:    return UIS_LOW;
+    case WIFI_ANAL_HIGH:   return UIS_HIGH;
+    default:               return UIS_CALIBRATING;
   }
 }
 

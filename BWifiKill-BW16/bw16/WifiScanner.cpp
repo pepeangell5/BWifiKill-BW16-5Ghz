@@ -1,4 +1,5 @@
 #include "WifiScanner.h"
+#include "ui_lang.h"
 
 static uint8_t networkCount = 0;
 static NetworkInfo networks[MAX_NETWORKS];
@@ -205,7 +206,7 @@ const char *wifiScannerSecurityName(uint32_t security) {
 }
 
 void wifiScannerPrintToSerial() {
-  Serial.print("Redes encontradas: ");
+  Serial.print(UIS_NETWORKS_FOUND);
   Serial.println(networkCount);
 
   for (uint8_t i = 0; i < networkCount; i++) {
@@ -213,7 +214,7 @@ void wifiScannerPrintToSerial() {
 
     Serial.print(i);
     Serial.print(" SSID=");
-    Serial.print(network.ssid[0] ? network.ssid : "<oculta>");
+    Serial.print(network.ssid[0] ? network.ssid : UIS_HIDDEN);
     Serial.print(" CH=");
     Serial.print(network.channel);
     Serial.print(" BAND=");
